@@ -1,11 +1,12 @@
-module git.neds.sh/matty/entain/racing
+module git.neds.sh/matty/entain/sports
 
 go 1.16
 
 require (
+	github.com/Masterminds/squirrel v1.5.3 // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3
-	github.com/mattn/go-sqlite3 v1.14.6
+	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.0 // indirect
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
