@@ -2,14 +2,25 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/pkg/errors"
 
 	"git.neds.sh/matty/entain/racing/proto/racing"
+)
+
+var (
+	invalidOrderByFieldErr = errors.New("invalid order by field")
+)
+
+const (
+	sortOrderDescLower = "desc"
 )
 
 // RacesRepo provides repository access to races.
@@ -52,7 +63,10 @@ func (r *racesRepo) List(filter *racing.ListRacesRequestFilter) ([]*racing.Race,
 
 	query = getRaceQueries()[racesList]
 
-	query, args = r.applyFilter(query, filter)
+	query, args, err = r.applyFilter(query, filter)
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -62,14 +76,14 @@ func (r *racesRepo) List(filter *racing.ListRacesRequestFilter) ([]*racing.Race,
 	return r.scanRaces(rows)
 }
 
-func (r *racesRepo) applyFilter(query string, filter *racing.ListRacesRequestFilter) (string, []interface{}) {
+func (r *racesRepo) applyFilter(query string, filter *racing.ListRacesRequestFilter) (string, []interface{}, error) {
 	var (
 		clauses []string
 		args    []interface{}
 	)
 
 	if filter == nil {
-		return query, args
+		return query, args, nil
 	}
 
 	if len(filter.MeetingIds) > 0 {
@@ -93,7 +107,19 @@ func (r *racesRepo) applyFilter(query string, filter *racing.ListRacesRequestFil
 		query += " WHERE " + strings.Join(clauses, " AND ")
 	}
 
-	return query, args
+	// custom order-by has been set we need to build it.
+	if filter.OrderBy != "" {
+		orderByClause, err := buildAndValidateOrderByClause(filter.OrderBy)
+		if err != nil {
+			return "", nil, err
+		}
+
+		query += orderByClause
+	} else {
+		query += " ORDER BY advertised_start_time DESC"
+	}
+
+	return query, args, nil
 }
 
 func (r *racesRepo) scanRaces(rows *sql.Rows) ([]*racing.Race, error) {
@@ -122,4 +148,59 @@ func (r *racesRepo) scanRaces(rows *sql.Rows) ([]*racing.Race, error) {
 	}
 
 	return races, nil
+}
+
+func buildAndValidateOrderByClause(orderByFilter string) (string, error) {
+	// example order_by: meeting_id desc, id
+	// each comma separated section is either 1 or 2 "words"
+	// blank second section == "asc" sort order
+	// more details here: https://cloud.google.com/apis/design/design_patterns#sorting_order
+
+	var orderByClause string
+	t := reflect.TypeOf(racing.Race{})
+	orderByClause = " ORDER BY "
+
+	//split order-by fields by comma, into "words" made up of either field name or field name + "desc"
+	orderBySplit := strings.Split(orderByFilter, ",")
+	for i, field := range orderBySplit {
+		word := strings.Split(strings.TrimLeft(strings.TrimRight(field, " "), " "), " ")
+		switch {
+		case len(word) == 1:
+			// validate that the requested order by field exists using reflection
+			_, ok := t.FieldByNameFunc(func(s string) bool {
+				return strings.ToLower(s) == strings.ReplaceAll(word[0], "_", "")
+			})
+			if !ok {
+				return "", invalidOrderByFieldErr
+			}
+
+			orderByClause += fmt.Sprintf("%s ASC", word[0])
+
+		case len(word) == 2:
+			// ensure the second "word" is desc, if it isn't we want to error now
+			if strings.ToLower(word[1]) != sortOrderDescLower {
+				return "", invalidOrderByFieldErr
+			}
+
+			// validate that the requested order by field exists using reflection
+			_, ok := t.FieldByNameFunc(func(s string) bool {
+				return strings.ToLower(s) == strings.ReplaceAll(word[0], "_", "")
+			})
+			if !ok {
+				return "", invalidOrderByFieldErr
+			}
+			orderByClause += fmt.Sprintf("%s DESC", word[0])
+
+		default:
+			// default error case to capture anything that isn't our 2 success cases
+			return "", invalidOrderByFieldErr
+		}
+
+		// add comma to clause when we have more terms to add
+		if i != len(orderBySplit)-1 {
+			orderByClause += ", "
+		}
+	}
+
+	return orderByClause, nil
 }
