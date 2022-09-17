@@ -20,6 +20,8 @@ var (
 )
 
 const (
+	raceStatusClosed   = "CLOSED"
+	raceStatusOpen     = "OPEN"
 	sortOrderDescLower = "desc"
 )
 
@@ -137,6 +139,8 @@ func (r *racesRepo) scanRaces(rows *sql.Rows) ([]*racing.Race, error) {
 			return nil, err
 		}
 
+		race.Status = calculateRaceStatus(advertisedStart)
+
 		ts, err := ptypes.TimestampProto(advertisedStart)
 		if err != nil {
 			return nil, err
@@ -203,4 +207,11 @@ func buildAndValidateOrderByClause(orderByFilter string) (string, error) {
 	}
 
 	return orderByClause, nil
+}
+
+func calculateRaceStatus(advertisedTime time.Time) string {
+	if time.Now().After(advertisedTime) {
+		return raceStatusClosed
+	}
+	return raceStatusOpen
 }
