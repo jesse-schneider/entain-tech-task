@@ -6,9 +6,10 @@ import (
 	"log"
 	"net/http"
 
-	"git.neds.sh/matty/entain/api/proto/racing"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
+
+	"git.neds.sh/matty/entain/api/proto/racing"
 )
 
 var (

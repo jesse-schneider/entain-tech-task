@@ -2,11 +2,12 @@ package db
 
 import (
 	"database/sql"
-	"github.com/golang/protobuf/ptypes"
-	_ "github.com/mattn/go-sqlite3"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/golang/protobuf/ptypes"
+	_ "github.com/mattn/go-sqlite3"
 
 	"git.neds.sh/matty/entain/racing/proto/racing"
 )
@@ -79,6 +80,15 @@ func (r *racesRepo) applyFilter(query string, filter *racing.ListRacesRequestFil
 		}
 	}
 
+	// Added new filter check here: if visible_races_only is present, add visible = true to WHERE clause.
+	// NOTE:: I have extended this as-is for this task, however I would have
+	// potentially looked at re-writing this function to use a query builder tool such as squirrel (see: https://github.com/Masterminds/squirrel)
+	// why would I re-write? I personally find the builder pattern is far more readable for generating SQL.
+	if filter.VisibleRacesOnly {
+		clauses = append(clauses, "visible = ?")
+		args = append(args, true)
+	}
+
 	if len(clauses) != 0 {
 		query += " WHERE " + strings.Join(clauses, " AND ")
 	}
@@ -86,9 +96,7 @@ func (r *racesRepo) applyFilter(query string, filter *racing.ListRacesRequestFil
 	return query, args
 }
 
-func (m *racesRepo) scanRaces(
-	rows *sql.Rows,
-) ([]*racing.Race, error) {
+func (r *racesRepo) scanRaces(rows *sql.Rows) ([]*racing.Race, error) {
 	var races []*racing.Race
 
 	for rows.Next() {
