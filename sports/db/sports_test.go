@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_calculateRaceStatus(t *testing.T) {
+func Test_calculateEventStatus(t *testing.T) {
 	tests := []struct {
 		name           string
 		advertisedTime time.Time
@@ -31,8 +31,8 @@ func Test_calculateRaceStatus(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := calculateRaceStatus(tt.advertisedTime); got != tt.want {
-				t.Errorf("calculateRaceStatus() = %v, want %v", got, tt.want)
+			if got := calculateEventStatus(tt.advertisedTime); got != tt.want {
+				t.Errorf("calculateEventStatus() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -47,19 +47,19 @@ func Test_buildAndValidateOrderByClause(t *testing.T) {
 	}{
 		{
 			name:          "success: standard format, 1 column",
-			orderByFilter: "meeting_id desc",
-			want:          " ORDER BY meeting_id DESC",
+			orderByFilter: "id desc",
+			want:          " ORDER BY id DESC",
 			wantErr:       assert.NoError,
 		},
 		{
 			name:          "success: standard format, 2 columns",
-			orderByFilter: "meeting_id, id desc",
-			want:          " ORDER BY meeting_id ASC, id DESC",
+			orderByFilter: "name, id desc",
+			want:          " ORDER BY name ASC, id DESC",
 			wantErr:       assert.NoError,
 		},
 		{
 			name:          "fail: capital letters",
-			orderByFilter: "Name, MeetingId desc",
+			orderByFilter: "Name, Id desc",
 			want:          "",
 			wantErr:       assert.Error,
 		},
