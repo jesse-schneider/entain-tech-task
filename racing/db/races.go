@@ -17,6 +17,7 @@ import (
 
 var (
 	invalidOrderByFieldErr = errors.New("invalid order by field")
+	raceNotFoundErr        = errors.New("race not found")
 )
 
 const (
@@ -32,6 +33,9 @@ type RacesRepo interface {
 
 	// List will return a list of races.
 	List(filter *racing.ListRacesRequestFilter) ([]*racing.Race, error)
+
+	// Get will return a single race, matched by id.
+	Get(id string) (*racing.Race, error)
 }
 
 type racesRepo struct {
@@ -76,6 +80,30 @@ func (r *racesRepo) List(filter *racing.ListRacesRequestFilter) ([]*racing.Race,
 	}
 
 	return r.scanRaces(rows)
+}
+
+// Get will retrieve the race with the matching id, or return a relevant error if it cannot.
+func (r *racesRepo) Get(id string) (*racing.Race, error) {
+	var (
+		err   error
+		query string
+	)
+
+	query = getRaceQueries()[racesGet]
+	rows, err := r.db.Query(query, id)
+	if err != nil {
+		return nil, err
+	}
+
+	races, err := r.scanRaces(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(races) > 0 {
+		return races[0], nil
+	}
+	return nil, raceNotFoundErr
 }
 
 func (r *racesRepo) applyFilter(query string, filter *racing.ListRacesRequestFilter) (string, []interface{}, error) {
